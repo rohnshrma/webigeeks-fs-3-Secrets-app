@@ -4,10 +4,11 @@ const app = express();
 const bodyParser = require("body-parser");
 
 const mongoose = require("mongoose");
-const exp = require("constants");
-const { type } = require("os");
+const md5 = require("md5");
 
 const PORT = 3000;
+
+console.log(md5("roHan@121199"));
 
 // middlewares
 
@@ -58,7 +59,7 @@ app.post("/signup", (req, res) => {
 
   const newUser = new User({
     email: req.body.username,
-    password: req.body.password,
+    password: md5(req.body.password),
   });
 
   newUser
@@ -83,7 +84,7 @@ app.post("/login", (req, res) => {
 
   User.find({ email: req.body.username })
     .then((foundUser) => {
-      if (foundUser[0].password == req.body.password) {
+      if (foundUser[0].password == md5(req.body.password)) {
         res.render("secrets");
       } else {
         res.write("<h1>INVALID PASSWORD</h1> ");
