@@ -1,4 +1,4 @@
-// ========================= level 4 bcrypt
+// ========================= level 5 bcrypt
 
 const express = require("express");
 const app = express();
@@ -14,15 +14,6 @@ const saltRounds = 11;
 
 const PORT = 3000;
 
-// middlewares
-
-app.use(bodyParser.urlencoded({ extended: true }));
-app.use(express.static("public"));
-app.set("view engine", "ejs");
-
-app.use(passport.initialize());
-app.use(passport.session());
-
 mongoose
   .connect("mongodb://localhost:27017/webigeeks-secretsDB")
   .then(() => {
@@ -34,6 +25,11 @@ mongoose
   .catch((err) => {
     console.log(err);
   });
+// middlewares
+
+app.use(bodyParser.urlencoded({ extended: true }));
+app.use(express.static("public"));
+app.set("view engine", "ejs");
 
 app.use(
   session({
@@ -43,6 +39,8 @@ app.use(
     cookie: { maxAge: 24 * 60 * 60 * 1000 }, // milliseconds
   })
 );
+app.use(passport.initialize());
+app.use(passport.session());
 
 // schema
 const userSchema = new mongoose.Schema(
@@ -101,6 +99,12 @@ passport.deserializeUser(async (id, done) => {
   }
 });
 
+app.use((req, res, next) => {
+  console.log(req.isAuthenticated());
+
+  next();
+});
+
 //   ROUTES
 
 // ------- HOME ROUTE
@@ -110,22 +114,30 @@ app.get("/", (req, res) => {
 
 // --------SIGNUP ROUTE
 
+app.post(
+  "/login",
+  passport.authenticate("local", {
+    successRedirect: "/secrets",
+    failureRedirect: "/login",
+  })
+);
+
 app.get("/signup", (req, res) => {
   res.render("register");
 });
 
 app.post("/signup", async (req, res) => {
-  const { name, username, password } = req.body;
+  const { email, password } = req.body;
 
   try {
-    const existingUser = await User.findOne({ email: username });
+    const existingUser = await User.findOne({ email: email });
     if (existingUser) {
       return res.redirect("/auth/login");
     }
 
     const hash = await bcrypt.hash(password, saltRounds);
 
-    const newUser = new User({ email: username, password: hash });
+    const newUser = new User({ email: email, password: hash });
     await newUser.save();
 
     req.login(newUser, (err) => {
@@ -139,39 +151,36 @@ app.post("/signup", async (req, res) => {
   }
 });
 
+// logout
+app.get("/logout", (req, res, next) => {
+  console.log("Logout triggered!");
+  req.logout((err) => {
+    if (err) return next(err);
+  });
+  res.redirect("/");
+});
+
 // --------LOGIN ROUTE
 
 app.get("/login", (req, res) => {
   res.render("login");
 });
 
-app.post("/login", (req, res) => {
-  // console.log(req.body);
-
-  User.find({ email: req.body.username })
-    .then((foundUser) => {
-      if (foundUser.length === 1) {
-        bcrypt
-          .compare(req.body.password, foundUser[0].password)
-          .then((result) => {
-            if (result) {
-              console.log("password matched");
-              res.render("secrets");
-            } else {
-              console.log("Incorrect password");
-              res.redirect("/login");
-            }
-          });
-      } else {
-        console.log(`user with ${req.body.username} doesn't exists.`);
-        res.redirect("/signup");
-      }
-    })
-    .catch((err) => {
-      console.log(err);
-      res.redirect("/login");
-    });
+app.get("/secrets", (req, res) => {
+  if (req.isAuthenticated()) {
+    res.render("secrets");
+  } else {
+    res.redirect("/login");
+  }
 });
+
+// app.get("/submit", (req, res) => {
+//   if (req.isAuthenticated()) {
+//     res.render("submit");
+//   } else {
+//     res.redirect("/login");
+//   }
+// });
 
 // ========================= level 3 md5
 
